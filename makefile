@@ -1,6 +1,4 @@
-
 CXX = g++
-
 SRC_DIR = ./src/
 TARGET = duck_db
 OBJ = bpt.o duck_db.o

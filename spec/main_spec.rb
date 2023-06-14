@@ -21,8 +21,6 @@ describe 'database' do
     end
     raw_output.split("\n")
   end
-
-
   it 'insert test' do
     script = (1..5000).map do |i|
       "insert db #{i} user#{i} #{i*12} person#{i}@example.com"
