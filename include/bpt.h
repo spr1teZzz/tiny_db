@@ -20,19 +20,21 @@ namespace bpt {
 #define SIZE_NO_CHILDREN sizeof(leaf_node_t) - BP_ORDER * sizeof(record_t)
 
 /* meta information of B+ tree */
+// B+树信息
 typedef struct {
     size_t order; /* `order` of B+ tree */
     size_t value_size; /* size of value */
     size_t key_size;   /* size of key */
-    size_t internal_node_num; /* how many internal nodes */
+    size_t internal_node_num; /* how many internal nodes 内部节点数*/
     size_t leaf_node_num;     /* how many leafs */
     size_t height;            /* height of tree (exclude leafs) */
-    off_t slot;        /* where to store new block */
-    off_t root_offset; /* where is the root of internal nodes */
+    off_t slot;        /* where to store new block 存储块信息*/ 
+    off_t root_offset; /* where is the root of internal nodes 内部节点的根的位置 */
     off_t leaf_offset; /* where is the first leaf */
 } meta_t;
 
 /* internal nodes' index segment */
+//内部节点的索引段
 struct index_t {
     key_t key;
     off_t child; /* child's offset */
@@ -40,15 +42,15 @@ struct index_t {
 
 /***
  * internal node block
+ * 可以在其他地方以 internal_node_t::child_t 形式使用
  ***/
 struct internal_node_t {
     typedef index_t * child_t;
-    
     off_t parent; /* parent node offset */
     off_t next;
     off_t prev;
-    size_t n; /* how many children */
-    index_t children[BP_ORDER];
+    size_t n; /* how many children 子节点个数*/
+    index_t children[BP_ORDER]; 
 };
 
 /* the final record of value */
@@ -68,7 +70,8 @@ struct leaf_node_t {
     record_t children[BP_ORDER];
 };
 
-/* the encapulated B+ tree */
+/* the encapsulated B+ tree */
+//封装B+树
 class bplus_tree {
 public:
     bplus_tree(const char *path, bool force_empty = false);
@@ -83,7 +86,7 @@ public:
     int update(const key_t& key, value_t value);
     meta_t get_meta() const {
         return meta;
-};
+    };
 
 #ifndef UNIT_TEST
 private:
@@ -91,13 +94,13 @@ private:
 public:
 #endif
     char path[512];
-    meta_t meta;
+    meta_t meta;//定义B+树信息
 
     /* init empty tree */
-    void init_from_empty();
+    void init_from_empty();//初始化为空
 
-    /* find index */
-    off_t search_index(const key_t &key) const;
+    /* find index */ 
+    off_t search_index(const key_t &key) const;//根据索引查找
 
     /* find leaf */
     off_t search_leaf(off_t index, const key_t &key) const;
@@ -146,12 +149,13 @@ public:
     template<class T>
     void node_remove(T *prev, T *node);
 
-    /* multi-level file open/close */
-    mutable FILE *fp;
-    mutable int fp_level;
+    /* multi-level file open/close 多级文件打开/关闭 */
+    mutable FILE *fp;           //文件指针
+    mutable int fp_level;       //跟踪文件的打开和关闭状态 0:关闭 1:打开
+    //被mutable修饰的变量，将永远处于可变的状态，即使在一个const函数中
     void open_file(const char *mode = "rb+") const
     {
-        // `rb+` will make sure we can write everywhere without truncating file
+        // `rb+` 将确保我们可以在任何地方写入而不会截断文件
         if (fp_level == 0)
             fp = fopen(path, mode);
 
@@ -166,44 +170,44 @@ public:
         --fp_level;
     }
 
-    /* alloc from disk */
+    /* alloc from disk 从磁盘分配*/
     off_t alloc(size_t size)
     {
-        off_t slot = meta.slot;
-        meta.slot += size;
-        return slot;
+        off_t slot = meta.slot; //存储块信息
+        meta.slot += size;//向后移动到下一个可以存储信息的位置
+        return slot;//返回存储位置
     }
 
     off_t alloc(leaf_node_t *leaf)
     {
         leaf->n = 0;
-        meta.leaf_node_num++;
-        return alloc(sizeof(leaf_node_t));
+        meta.leaf_node_num++;//B+数的叶子节点+1
+        return alloc(sizeof(leaf_node_t));//返回存储叶子节点的位置
     }
 
     off_t alloc(internal_node_t *node)
     {
-        node->n = 1;
-        meta.internal_node_num++;
-        return alloc(sizeof(internal_node_t));
+        node->n = 1; //子节点数
+        meta.internal_node_num++; //内部节点数+1
+        return alloc(sizeof(internal_node_t));//返回当前node存储的位置
     }
 
     void unalloc(leaf_node_t *leaf, off_t offset)
     {
-        --meta.leaf_node_num;
+        --meta.leaf_node_num;//叶子节点数-1
     }
 
     void unalloc(internal_node_t *node, off_t offset)
     {
-        --meta.internal_node_num;
+        --meta.internal_node_num;//内部节点数-1
     }
 
-    /* read block from disk */
+    /* read block from disk 从磁盘读取块*/
     int map(void *block, off_t offset, size_t size) const
     {
-        open_file();
-        fseek(fp, offset, SEEK_SET);
-        size_t rd = fread(block, size, 1, fp);
+        open_file();                            //打开存储文件
+        fseek(fp, offset, SEEK_SET);            //SEEK_SET:基于文件开头偏移 SEEK_CUR:基于当前位置偏移 SEEK_END:基于文件末尾
+        size_t rd = fread(block, size, 1, fp);  //写入数据到block
         close_file();
 
         return rd - 1;
@@ -215,12 +219,12 @@ public:
         return map(block, offset, sizeof(T));
     }
 
-    /* write block to disk */
+    /* write block to disk 将块写入磁盘*/
     int unmap(void *block, off_t offset, size_t size) const
     {
         open_file();
         fseek(fp, offset, SEEK_SET);
-        size_t wd = fwrite(block, size, 1, fp);
+        size_t wd = fwrite(block, size, 1, fp);//写入数据
         close_file();
 
         return wd - 1;

@@ -10,6 +10,7 @@
 #include <string.h>	
 #include <iostream>
 #include <fstream>
+#include <regex>
 
 using namespace bpt;
 using namespace std;
@@ -35,18 +36,19 @@ void printTable(int *index, value_t *values);
 void intToKeyT(bpt::key_t *a,int *b);
 bool is_file_exist(const char *fileName);
 double durationTime(clock_t *f,clock_t *s);
-
+void optimize_command(char* cmd);
 
 bplus_tree *duck_db_ptr;
 
 // initial
 void initialSystem(){
-	// step 1 : print help message
+	// step 1 : print help message 打印帮助消息
 	printHelpMess();
-	// step 2 : initial database from file
+	// step 2 : initial database from file 初始文件数据库
 	bplus_tree duck_db(dbFileName, (!is_file_exist(dbFileName)));
 	duck_db_ptr = &duck_db;
-	// step 3 : REPL select commdand (insert,delete,update,search)
+	//"读取-求值-输出"循环（英语：Read-Eval-Print Loop，简称REPL）
+	// step 3 : REPL select commdand (insert,delete,update,search) 
 	selectCommand();
 	
 }
@@ -58,72 +60,118 @@ void printHelpMess(){
 		<<"  .help 							print help message;"<<endl
 		<<"  .exit 							exit program;"<<endl
 		<<"  .reset 							delete db file;"<<endl
-		<<"  insert db {index} {name} {age} {email}; 			insert record;"<<endl
+		<<"  insert into db({index},{name},{age},{email}); 			insert record;"<<endl
 		<<"  delete from db where id ={index}; 				delete record;"<<endl
-		<<"  update db {name} {age} {email} where id={index}; 		update a record;"<<endl
+		<<"  update db({name} {age} {email}) where id={index}; 		update a record;"<<endl
 		<<"  select * from db where id={index}; 				search a record by index;"<<endl
 		<<"  select * from db where id in({minIndex},{maxIndex}); 		search records between indexs;"<<endl
 		<<"*********************************************************************************************"<<endl
 		<<endl << nextLineHeader;
 }
-
+void optimize_command(char* cmd)
+{
+	char * tmp = new char[256];
+	int pos = 0;
+	//处理语句前空格
+	int size = strlen(cmd);
+	int space_cnt = 0;
+	for(int i=0;i<size;++i)
+	{
+		if(cmd[i] == ' ')
+		{
+			space_cnt++;
+		}else
+		{
+			break;
+		}
+	}
+	//跳过前导空格,后面每遇到两个以上空格改成一个
+	for(int i=space_cnt;i<size;++i)
+	{
+		if(cmd[i] == ' ' && i>0 && cmd[i-1] ==' ')
+		{
+			continue;
+		}
+		if(cmd[i] == ' ' && i>0 && cmd[i-1] =='=') continue;
+		
+		if(cmd[i] == '=' && (i-1>0) && (cmd[i-1] ==' ')) pos--;
+		
+		tmp[pos++] = cmd[i];
+	}
+	//去掉尾部空格
+	if(cmd[size-1] == ' ')
+	{
+		tmp[pos-1] = '\0';
+	}
+	cout<<"tmp:"<<tmp<<endl;
+	strcpy(cmd,tmp);
+	delete []tmp;
+}
 // select command
 void selectCommand(){
 
 	// REPL
 	char *userCommand = new char[256];
-	
+	//获取命令
 	while(true){
 
 		cin.getline(userCommand,256);
-		
+		optimize_command(userCommand);
+		cout<<"cmd:"<<userCommand<<endl;
 		if(strcmp(userCommand,".exit") == 0){
-
+			//退出
 	    	cout << exitMessage;
 			break;
 
 	    }else if(strcmp(userCommand,".help") == 0){
-
+			//帮助
 	    	printHelpMess();
 
 	    }else if(strcmp(userCommand,".reset") == 0){
+			//删除存储文件
 	    	if( remove( dbFileName) != 0 )
 	    		cout<< "can't delete file"<< nextLineHeader;
 	    	else
 				cout << "DB file has been deleted!"<< endl << endl;
-
+			//重新创建文件
 	    	initialSystem();
 
 	    }else if(strncmp(userCommand,"insert",6) == 0){
-
+			//与前6个字母比较
 	    	int *keyIndex = new int;
 	    	value_t *insertData = new value_t;
 
-	    	int okNum = sscanf(userCommand,"insert db %d %s %d %s;", 
-	    		keyIndex, insertData->name,&(insertData->age),insertData->email);
-
-			if(okNum < 3){
+			std::regex pattern("insert into db\\(\\s*(\\d+),([^,]+),(\\d+),([^)]+)\\)\\s*;");
+			std::smatch matches;
+			std::string commandString(userCommand);
+			if(regex_search(commandString, matches, pattern))
+			{
 				
-				cout << errorMessage<< nextLineHeader;
-
-			}else{
-
-        		startTime = clock(); 
-
-				int return_code = insertRecord(duck_db_ptr,keyIndex,insertData);
-
-				finishTime = clock(); 
-
-				if (return_code == 0){
-					// cout << ">insert\n";
-					cout << "> executed insert index:"<<   *keyIndex << ", time : "<< durationTime(&finishTime,&startTime) <<" seconds\n"<< nextLineHeader;
-				}else if(return_code == 1){
-					cout << "> failed: already exist index:"<<   *keyIndex << "\n"<< nextLineHeader;
-				}else{
-					cout << "> failed!\n"<< nextLineHeader;
-				}
 			}
 
+
+	    	// int okNum = sscanf(userCommand,"insert into db(%d,%s,%d,%s);", 
+	    	// 	keyIndex, insertData->name,&(insertData->age),insertData->email);
+			// cout<<"okNum:"<<okNum<<endl;
+			// if(okNum < 3){
+			// 	cout << errorMessage<< nextLineHeader;
+			// }else{
+
+        	// 	startTime = clock(); 
+
+			// 	int return_code = insertRecord(duck_db_ptr,keyIndex,insertData);
+
+			// 	finishTime = clock(); 
+
+			// 	if (return_code == 0){
+			// 		// cout << ">insert\n";
+			// 		cout << "> executed insert index:"<<   *keyIndex << ", time : "<< durationTime(&finishTime,&startTime) <<" seconds\n"<< nextLineHeader;
+			// 	}else if(return_code == 1){
+			// 		cout << "> failed: already exist index:"<<   *keyIndex << "\n"<< nextLineHeader;
+			// 	}else{
+			// 		cout << "> failed!\n"<< nextLineHeader;
+			// 	}
+			// }
 
 	    }else if(strncmp(userCommand,"delete",6) == 0){
 

@@ -12,6 +12,7 @@ using std::upper_bound;
 namespace bpt {
 
 /* custom compare operator for STL algorithms */
+//STL算法的自定义比较运算符
 OPERATOR_KEYCMP(index_t)
 OPERATOR_KEYCMP(record_t)
 
@@ -647,7 +648,7 @@ void bplus_tree::node_remove(T *prev, T *node)
 
 void bplus_tree::init_from_empty()
 {
-    // init default meta
+    // init default meta 初始化B+树信息
     bzero(&meta, sizeof(meta_t));
     meta.order = BP_ORDER;
     meta.value_size = sizeof(value_t);
@@ -655,18 +656,18 @@ void bplus_tree::init_from_empty()
     meta.height = 1;
     meta.slot = OFFSET_BLOCK;
 
-    // init root node
+    // init root node 初始化根节点
     internal_node_t root;
     root.next = root.prev = root.parent = 0;
-    meta.root_offset = alloc(&root);
+    meta.root_offset = alloc(&root);//存储根节点的位置
 
-    // init empty leaf
+    // init empty leaf 初始化空白叶子节点
     leaf_node_t leaf;
     leaf.next = leaf.prev = 0;
-    leaf.parent = meta.root_offset;
+    leaf.parent = meta.root_offset;//赋值叶子节点的根为根节点
     meta.leaf_offset = root.children[0].child = alloc(&leaf);
 
-    // save
+    // save 对象的内容写回到对应的存储位置上
     unmap(&meta, OFFSET_META);
     unmap(&root, meta.root_offset);
     unmap(&leaf, root.children[0].child);
